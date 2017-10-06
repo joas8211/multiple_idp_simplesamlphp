@@ -134,21 +134,25 @@ function _simplesaml_auth_user_register($authname) {
             );
 
             /**
-             * If you want, you can place more custom fields and populate them here
-             * @example
-             * if (isset($simplesamlphp_authsource->firstname)) {
-             *   $userinfo['field_first_name'] = array(
-             *     'und' => array(array('value' => $simplesamlphp_drupal->getAttrsFromAssertion($simplesamlphp_authsource->firstname)))
-             *   );
-             * }
+             * Populate custom fields
              */
+            if (isset($simplesamlphp_authsource->custom_fields)) {
+                foreach($simplesamlphp_authsource->custom_fields as $field_name => $attribute_name) {
+                    if (!empty($field_name) && !empty($attribute_name)) {
+                        $userinfo[$field_name] = array(
+                            'und' => array(array('value' => $simplesamlphp_drupal->getAttrsFromAssertion($attribute_name)))
+                        );
+                    } // end if
+                } // end foreach
+            } // end if
+
             /**
-             * Populate roles 
+             * Populate roles
              */
             $roles = array();
             try {
                 // Get SAML attributes
-                $attrs = $simplesamlphp_auth_as->getAttributes();                
+                $attrs = $simplesamlphp_auth_as->getAttributes();
 
                 if ($simplesamlphp_authsource->syncroles) {
                     // The roles provided by the IdP.

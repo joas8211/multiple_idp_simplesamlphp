@@ -92,7 +92,7 @@ class SimpleSAML_Drupal {
             if (!file_exists($basedir)) {
                 if ($watchdog === TRUE) {
                     watchdog('simplesamlphp_auth', 'SimpleSAMLphp could not be found at %basedir . The simplesamlphp_auth module
-						cannot function until the path to the local SimpleSAMLphp instance is configured.', array('%basedir' => $basedir), WATCHDOG_WARNING);
+                        cannot function until the path to the local SimpleSAMLphp instance is configured.', array('%basedir' => $basedir), WATCHDOG_WARNING);
                 } // end if
                 return FALSE;
             } // end if
@@ -100,7 +100,7 @@ class SimpleSAML_Drupal {
         } else {
             if ($watchdog === TRUE) {
                 watchdog('simplesamlphp_auth', 'SimpleSAMLphp is not active. The simplesamlphp_auth module
-						cannot function until is activated, enabling the module is not enough.', NULL, WATCHDOG_WARNING);
+                        cannot function until is activated, enabling the module is not enough.', NULL, WATCHDOG_WARNING);
             } // end if
             return FALSE;
         } // end if - else
@@ -137,7 +137,12 @@ class SimpleSAML_Drupal {
                     if ($key == 'cs_fields') {
                         foreach ($data as $additional_data) {
                             $additional_data = explode(':', $additional_data);
-                            $this->_simplesaml_auth_source->{$additional_data[0]} = $additional_data[1];
+                            if (isset($additional_data[1]) && !empty($additional_data[1])) {
+                                // Wrap all custom fields around the custom fields property to access them later
+                                $this->_simplesaml_auth_source->custom_fields[$additional_data[0]] = $additional_data[1];
+                            } else {
+                                watchdog('simplesamlphp_auth', 'Unable to load custom field into the SAML object, verify that you\'re using the correct operator', array(), WATCHDOG_DEBUG);
+                            } // end if - else
                         } // end foreach
                     } // end if
                     $this->_simplesaml_auth_source->{$key} = $data;
@@ -232,7 +237,7 @@ class SimpleSAML_Drupal {
         if ($config_store_type == 'phpsession') {
             if ($watchdog === TRUE) {
                 watchdog('simplesamlphp_auth', 'A user attempted to login using simplesamlphp but the store.type is phpsession,
-					use memcache or sql for simplesamlphp session storage. See: simplesamlphp/config/config.php.', NULL, WATCHDOG_WARNING);
+                    use memcache or sql for simplesamlphp session storage. See: simplesamlphp/config/config.php.', NULL, WATCHDOG_WARNING);
             } // end if
             return FALSE;
         } // end if

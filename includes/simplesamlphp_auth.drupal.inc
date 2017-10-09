@@ -134,17 +134,6 @@ class SimpleSAML_Drupal {
                 setcookie('MyIDP', (string) $this->_simplesaml_auth_source->id, time() + (60 * 60));
                 $attributes = unserialize($this->_simplesaml_auth_source->attributes);
                 foreach ($attributes as $key => $data) {
-                    if ($key == 'cs_fields') {
-                        foreach ($data as $additional_data) {
-                            $additional_data = explode(':', $additional_data);
-                            if (isset($additional_data[1]) && !empty($additional_data[1])) {
-                                // Wrap all custom fields around the custom fields property to access them later
-                                $this->_simplesaml_auth_source->custom_fields[$additional_data[0]] = $additional_data[1];
-                            } else {
-                                watchdog('simplesamlphp_auth', 'Unable to load custom field into the SAML object, verify that you\'re using the correct operator', array(), WATCHDOG_DEBUG);
-                            } // end if - else
-                        } // end foreach
-                    } // end if
                     $this->_simplesaml_auth_source->{$key} = $data;
                 } // end foreach
                 $sp_name = $this->_simplesaml_auth_source->source_name;

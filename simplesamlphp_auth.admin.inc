@@ -77,15 +77,15 @@ function simplesamlphp_auth_settings() {
     '#title' => t('Register users (i.e., auto-provisioning)'),
     '#default_value' => variable_get('simplesamlphp_auth_registerusers', TRUE),
     '#description' => t("Determines wether or not the module should automatically create/register new Drupal accounts for users that authenticate using SimpleSAMLphp. Unless you've done some custom work to provision Drupal accounts with the necessary authmap entries you will want this checked. NOTE: If unchecked each user must already have been provisioned a Drupal account with an appropriate entry in the authmap table before logging in. Otherwise they will receive a notice and be denied access. Be aware that simply creating a Drupal account will not create the necessary entry in the authmap table."),
-  );  
-   
+  );
+
   $form['simplesamlphp_auth_grp_auth'] = array(
     '#type' => 'fieldset',
     '#title' => t('Drupal Authentication'),
     '#collapsible' => TRUE,
     '#collapsed' => TRUE,
   );
-  
+
   $form['simplesamlphp_auth_grp_auth']['simplesamlphp_auth_allowsetdrupalpwd'] = array(
     '#type' => 'checkbox',
     '#title' => t('Allow SAML users to set Drupal passwords.'),
@@ -154,12 +154,12 @@ function simplesamlphp_auth_idp_settings() {
   $output = array(
     'introduction' => array(
       '#markup' => '<p>The following table contains the active IDP domains on the system.</p>'
-    ),      
+    ),
     'table'   => array(
       '#theme'  => 'table',
       '#header' => array(
-          t('Company'),
-          t('IDP Domain'),
+          t('Title'),
+          t('Domain'),
           array('data' => t('Actions'), 'colspan' => 2),
       ),
       '#rows' => _simplesamlphp_auth_idp_rows(),
@@ -195,92 +195,104 @@ function _simplesamlphp_auth_idp_rows() {
   );
 }
 /**
+ * This method returns an array with all user properties that can be mapped in IdP add / edit form's property mapping section
+ * @see simplesamlphp_auth_form
+ */
+function simplesamlphp_auth_get_mappable_user_properties() {
+  $user_property_info = entity_get_property_info('user');
+  $mappable_base_properties = array_fill_keys(array('name', 'mail'), array());
+  $properties = array_intersect_key($user_property_info['properties'], $mappable_base_properties);
+  $properties += $user_property_info['bundles']['user']['properties'];
+  return $properties;
+}
+/**
  * Implements hook_form()
  * Creates the form that allows the add / edit for IDPs
  * @see ssaml_auth_load
  */
 function simplesamlphp_auth_form($form, &$form_state, $idp = NULL) {
-    
-  
   $form['simplesamlphp_auth_grp_user'] = array(
     '#type' => 'fieldset',
     '#title' => (NULL !== $idp && !empty($idp->id)) ? t('Edit IDP Settings') : t('Register new IDP Domain'),
     '#collapsible' => TRUE,
     '#collapsed' => (NULL !== $idp && !empty($idp->id)) ? FALSE : TRUE
   );
-  $form['simplesamlphp_auth_grp_user']['simplesamlphp_auth_source'] = array(
-    '#type' => 'textfield',
-    '#title' => t("What name do you want to give to this connection"),
-    '#default_value' => isset($idp->source_name) && !empty($idp->source_name) ? $idp->source_name : '',
-    '#description' => t(
-      '<i>IMPORTANT:</i> Register this IDP source on the config/authsources.php file
-      located on the installation dir '. variable_get('simplesamlphp_auth_installdir') .' the name of the
-      Auth Source must be the same as the one registered on this field.' ),
-    '#required' => TRUE,
-  );
   $form['simplesamlphp_auth_grp_user']['simplesamlphp_auth_company_name'] = array(
     '#type' => 'textfield',
-    '#title' => t("What's the company name for the new IDP"),
+    '#title' => t('Title'),
     '#default_value' => isset($idp->company) && !empty($idp->company) ? $idp->company : '',
-    '#description' => t('Example: <i>Tax Analysts</i>'),
+    '#description' => t('Example: <i>Example Company Ltd</i>'),
+    '#required' => TRUE,
+  );
+  $form['simplesamlphp_auth_grp_user']['simplesamlphp_auth_source'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Authentication source'),
+    '#default_value' => isset($idp->source_name) && !empty($idp->source_name) ? $idp->source_name : '',
+    '#description' => t(
+      '<i>IMPORTANT:</i> Register this authentication source on the config/authsources.php file
+      located on the installation dir '. variable_get('simplesamlphp_auth_installdir') . '.<br>
+      The name of the authentication source must be the same as the one registered on this field.'
+    ),
     '#required' => TRUE,
   );
   $form['simplesamlphp_auth_grp_user']['simplesamlphp_auth_domain'] = array(
     '#type' => 'textfield',
-    '#title' => t("Which IDP domain you want to register"),
+    '#title' => t('Domain'),
     '#default_value' => isset($idp->domain) && !empty($idp->domain) ? $idp->domain : '',
-    '#description' => t('Example: <i>tax.org</i>'),
+    '#description' => t(
+      'Example: <i>example.com</i><br>
+      Domain used for IdP autodiscovery.'
+    ),
     '#required' => TRUE,
   );
   if (NULL !== $idp && !empty($idp->attributes)) {
     $attributes = unserialize($idp->attributes);
   } // end if
 
-  $form['simplesamlphp_auth_grp_user']['simplesamlphp_auth_user_name'] = array(
-    '#type' => 'textfield',
-    '#title' => t("Which attribute from the IDP should be used as user's alias"),
-    '#default_value' => isset($attributes['username']) && !empty($attributes['username']) ? $attributes['username'] : '',
-    '#description' => t('Example: <i>eduPersonPrincipalName</i> or <i>displayName</i><br />If the attribute is multivalued, the first value will be used.'),
-    '#required' => TRUE,
-  );
   $form['simplesamlphp_auth_grp_user']['simplesamlphp_auth_unique_id'] = array(
     '#type' => 'textfield',
-    '#title' => t('Which attribute from the IDP should be used as unique identifier for the user'),
+    '#title' => t('Uniquely identifiable attribute'),
     '#default_value' => isset($attributes['unique_id']) && !empty($attributes['unique_id']) ? $attributes['unique_id'] : '',
-    '#description' => t('Example: <i>eduPersonPrincipalName</i> or <i>eduPersonTargetedID</i><br />If the attribute is multivalued, the first value will be used. (If left empty the email address will be used)'),
+    '#description' => t(
+        'Example: <i>email</i>, <i>username</i> or <i>uid</i><br>
+        The attribute is used to identify user using this IdP.<br>
+        If the attribute is multivalued, the first value will be used. (If left empty the email address will be used)
+    '),
     '#required' => TRUE,
   );
-  $form['simplesamlphp_auth_grp_user']['simplesamlphp_auth_mailattr'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Which attribute from simpleSAMLphp should be used as user mail address'),
-    '#default_value' => isset($attributes['mailattr']) && !empty($attributes['mailattr']) ? $attributes['mailattr'] : '',
-    '#description' => t('Example: <i>mail</i><br />If the user attribute is multivalued, the first value will be used.'),
-    '#required' => TRUE,
+
+  // PROPERTY MAPPING
+  $properties = simplesamlphp_auth_get_mappable_user_properties();
+  $form['simplesamlphp_auth_grp_user']['simplesamlphp_auth_prop_mapping'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('PROPERTY MAPPING'),
   );
+  $form['simplesamlphp_auth_grp_user']['simplesamlphp_auth_prop_mapping']['info'] = array(
+    '#markup' => t('<p>Map IdP\'s SAML attributes to user properties.</p>'),
+  );
+  foreach ($properties as $property_name => $property) {
+    $form['simplesamlphp_auth_grp_user']['simplesamlphp_auth_prop_mapping']['simplesamlphp_auth_prop_mapping_' . $property_name] = array(
+        '#type' => 'textfield',
+        '#title' => $property['label'],
+        '#default_value' => isset($attributes['prop_mapping'][$property_name]) && !empty($attributes['prop_mapping'][$property_name]) ? $attributes['prop_mapping'][$property_name] : '',
+        '#description' => $property['description'],
+        '#required' => isset($property['required']) ? $property['required'] : true,
+    );
+  }
+  // PROPERTY MAPPING
+
+  // ROLE MAPPING
   $form['simplesamlphp_auth_grp_user']['simplesamlphp_auth_roleattr'] = array(
     '#type' => 'textfield',
-    '#title' => t('Which attribute from the IDP should be used as role identifier for the user'),
+    '#title' => t('Role attribute'),
     '#default_value' => isset($attributes['roleattr']) && !empty($attributes['roleattr']) ? $attributes['roleattr'] : '',
-    '#description' => t('Example: <i>roles</i><br />If the user attribute is multivalued, the first value will be used.'),
+    '#description' => t(
+      'Example: <i>roles</i><br>
+      SAML attribute used in role mapping.'
+    ),
     '#required' => FALSE,
   );
- 
-  $form['simplesamlphp_auth_grp_user']['simplesamlphp_auth_csfields'] = array(
-    '#type' => 'textarea',
-    '#title' => t('Additional attributes'),
-    '#default_value' => isset($attributes['cs_fields']) && !empty($attributes['cs_fields']) ? implode('|', $attributes['cs_fields']) : '',
-    '#description' => t('A pipe separated list of attributes that would map to custom fields.<br />Example: <i>CustomField:SAMLattr|CustomField:SAMLattr...</i> <br />For instance: <i>firstname:userName|companyname:company</i>'),
-  );
-  
-  // ROLE MAPPING OPTIONS  
-  $form['simplesamlphp_auth_grp_user']['simplesamlphp_auth_syncroles'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('<strong>Sync roles</strong>'),
-    '#default_value' => isset($attributes['syncroles']) && !empty($attributes['syncroles']) ? $attributes['syncroles'] : FALSE,
-    '#description' => t('<p>Auto-sync. The role of the Drupal user account will be synchronized with the data provided by the IdP.</p><p>Review the Mapping section.</p>'),
-    '#required' => FALSE
-  );
- 
+
   $form['simplesamlphp_auth_grp_user']['simplesamlphp_auth_role_mapping'] = array(
     '#type' => 'fieldset',
     '#title' => t('ROLE MAPPING')
@@ -290,15 +302,21 @@ function simplesamlphp_auth_form($form, &$form_state, $idp = NULL) {
     '#markup' => t('<p>The IdP can use it\'s own roles. Set in this section the mapping between IdP and Drupal roles. Accepts multiple valued comma separated.</p>')
   );
 
-  $form['simplesamlphp_auth_grp_user']['simplesamlphp_auth_role_mapping']['simplesamlphp_auth_role_mapping_administrator'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Administrator'),
-    '#default_value' => isset($attributes['rolemappattr']) && !empty($attributes['rolemappattr']) ? $attributes['rolemappattr'] : '',
-    '#required' => FALSE,
-    '#description' => t('Example: admin,owner,superuser.')
-  );
-  // ROLE MAPPING OPTIONS
-  
+  $roles = user_roles(TRUE);
+  foreach ($roles as $rid => $role_name) {
+    if ($rid == DRUPAL_AUTHENTICATED_RID) {
+        continue;
+    }
+    $form['simplesamlphp_auth_grp_user']['simplesamlphp_auth_role_mapping']['simplesamlphp_auth_role_mapping_' . $rid] = array(
+        '#type' => 'textfield',
+        '#title' => $role_name,
+        '#default_value' => isset($attributes['role_mapping'][$rid]) && !empty($attributes['role_mapping'][$rid]) ? $attributes['role_mapping'][$rid] : '',
+        '#required' => FALSE,
+        '#description' => t('Example: admin,owner,superuser.')
+    );
+  }
+  // ROLE MAPPING
+
   $form['actions'] = array('#type' => 'actions');
   $form['simplesamlphp_auth_grp_user']['actions']['submit'] = array(
     '#type' => 'submit',
@@ -335,19 +353,36 @@ function simplesamlphp_auth_form_submit($form, &$form_state) {
     'active' => 1
   );
   $attributes = array(
-    'username' => $form_state['values']['simplesamlphp_auth_user_name'],
     'unique_id' => $form_state['values']['simplesamlphp_auth_unique_id'],
-    'mailattr' => $form_state['values']['simplesamlphp_auth_mailattr'],
-    'roleattr' => $form_state['values']['simplesamlphp_auth_roleattr'],    
-    'syncroles' => $form_state['values']['simplesamlphp_auth_syncroles'],
-    'rolemappattr' => $form_state['values']['simplesamlphp_auth_role_mapping_administrator'],
+    'roleattr' => $form_state['values']['simplesamlphp_auth_roleattr'],
   );
-  /**
-   * Custome attributes are not mandatory
-   */
-  if (!empty( $form_state['values']['simplesamlphp_auth_csfields'])) {
-    $attributes['cs_fields'] = explode('|', $form_state['values']['simplesamlphp_auth_csfields']);
-  } // end if 
+
+  // Property mapping
+  $properties = simplesamlphp_auth_get_mappable_user_properties();
+  foreach ($properties as $property_name => $property) {
+      if (isset($form_state['values']['simplesamlphp_auth_prop_mapping_' . $property_name])) {
+          $value = $form_state['values']['simplesamlphp_auth_prop_mapping_' . $property_name];
+          if (!empty($value)) {
+            $attributes['prop_mapping'][$property_name] = $value;
+          }
+      }
+  }
+
+  // Role mapping
+  $roles = user_roles(TRUE);
+  foreach ($roles as $rid => $role_name) {
+    if ($rid == DRUPAL_AUTHENTICATED_RID) {
+      continue;
+    }
+    $saml_roles = explode(',', $form_state['values']['simplesamlphp_auth_role_mapping_' . $rid]);
+    foreach ($saml_roles as $saml_role) {
+      $saml_role = trim($saml_role);
+      if (!empty($saml_role)) {
+        $attributes['role_mapping'][$saml_role][$rid] = $role_name;
+      }
+    }
+  }
+
   $data['attributes'] = serialize($attributes);
   try {
     if (isset( $form_state['values']['simplesamlphp_auth_idp_id'] ) && (int) $form_state['values']['simplesamlphp_auth_idp_id'] > 0) {
@@ -390,19 +425,14 @@ function simplesamlphp_auth_form_validate($form, &$form_state) {
       array(':d' => $form_state['values']['simplesamlphp_auth_domain']))->fetchAll();
 
     if (!empty( $check_source)) {
-      form_set_error('simplesamlphp_auth_source', t('This source name has already been registered, try a different one.'));
+      form_set_error('simplesamlphp_auth_source', t('This authentication source has already been registered, try a different one.'));
     } // end if
     if(!empty($check_company)) {
-      form_set_error('simplesamlphp_auth_company_name', t('A company with that name already exists, try another one.'));
+      form_set_error('simplesamlphp_auth_company_name', t('A IdP with that title already exists, try another one.'));
     } // end if
     if(!empty($check_domain)) {
       form_set_error('simplesamlphp_auth_domain', t('This domain name is already active on the system, please try a different one.'));
     } // end if
-    
-    if($form_state['values']['simplesamlphp_auth_syncroles'] && empty($form_state['values']['simplesamlphp_auth_role_mapping_administrator'])){
-        form_set_error('simplesamlphp_auth_role_mapping_administrator', t('Auto-sync field is checked, This field can not be empty.'));
-    }
-    
   } // end if
 }
 /**

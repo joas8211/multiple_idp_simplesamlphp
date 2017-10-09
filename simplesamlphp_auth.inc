@@ -128,20 +128,16 @@ function _simplesaml_auth_user_register($authname) {
              * of the process is subscribers
              */
             $userinfo = array(
-                'name' => $simplesamlphp_drupal->getAttrsFromAssertion($simplesamlphp_authsource->username),
-                'mail' => $simplesamlphp_drupal->getAttrsFromAssertion($simplesamlphp_authsource->mailattr),
                 'timezone' => date_default_timezone_get(),
             );
 
             /**
-             * Populate custom fields
+             * Populate properties
              */
-            if (isset($simplesamlphp_authsource->custom_fields)) {
-                foreach($simplesamlphp_authsource->custom_fields as $field_name => $attribute_name) {
-                    if (!empty($field_name) && !empty($attribute_name)) {
-                        $userinfo[$field_name] = array(
-                            'und' => array(array('value' => $simplesamlphp_drupal->getAttrsFromAssertion($attribute_name)))
-                        );
+            if (isset($simplesamlphp_authsource->prop_mapping)) {
+                foreach($simplesamlphp_authsource->prop_mapping as $property_name => $attribute_name) {
+                    if (!empty($attribute_name)) {
+                        $userinfo[$property_name] = $simplesamlphp_drupal->getAttrsFromAssertion($attribute_name);
                     } // end if
                 } // end foreach
             } // end if
@@ -149,51 +145,28 @@ function _simplesaml_auth_user_register($authname) {
             /**
              * Populate roles
              */
-            $roles = array();
+            $roles = array(DRUPAL_AUTHENTICATED_RID => 'authenticated user');
             try {
                 // Get SAML attributes
                 $attrs = $simplesamlphp_auth_as->getAttributes();
 
-                if ($simplesamlphp_authsource->syncroles) {
-                    // The roles provided by the IdP.
-                    $roleMapping = $simplesamlphp_authsource->roleattr;
+                // The roles provided by the IdP.
+                $roleattr = $simplesamlphp_authsource->roleattr;
 
-                    if (!empty($roleMapping) && isset($attrs[$roleMapping]) && !empty($attrs[$roleMapping])) {
-                        $adminsRole = explode(',', $simplesamlphp_authsource->rolemappattr);
-                        $administrator = user_role_load_by_name('administrator');
-                        $adminWeight = $administrator->rid;
-                        // Match role names in the saml attributes to local role names.
-                        $roleWeight = 0;
-                        foreach ($attrs[$roleMapping] as $samlRole) {
-                            $samlRole = trim($samlRole);
-                            if (empty($samlRole)) {
-                                break;
-                            } else if (in_array($samlRole, $adminsRole)) {
-                                if ($roleWeight < $adminWeight) {
-                                    $roleWeight = $adminWeight;
-                                }
-                                break;
-                            } else {
-                                if ($loadedRole = user_role_load_by_name($samlRole)) {
-                                    $roles[$loadedRole->rid] = $loadedRole->name;
-                                }
-                            }
-                        }
-                        switch ($roleWeight) {
-                            // case 5:
-                            //   $roles = array(5 => 'customrole');
-                            //   break;
-                            case $adminWeight:
-                                $roles[$adminWeight] = 'administrator';
-                                break;
-                            case DRUPAL_AUTHENTICATED_RID: // default value => 2
-                            default:
-                                $roles[DRUPAL_AUTHENTICATED_RID] = 'authenticated user';
-                                break;
-                        }
+                // Role mapings from IdP settings
+                $rolemap = $simplesamlphp_authsource->role_mapping;
+
+                if (!empty($roleattr) && isset($attrs[$roleattr]) && !empty($attrs[$roleattr])) {
+                  // Match role names in the saml attributes to local role names.
+                  foreach ($attrs[$roleattr] as $saml_role) {
+                    $saml_role = trim($saml_role);
+                    if (empty($saml_role)) {
+                      break;
+                    } else if (isset($rolemap[$saml_role])) {
+                      $roles += $rolemap[$saml_role];
+                      break;
                     }
-                } else {
-                    $roles[DRUPAL_AUTHENTICATED_RID] = 'authenticated user';
+                  }
                 }
             } catch (Exception $e) {
                 watchdog_exception('simplesamlphp_auth', $e);
@@ -202,9 +175,18 @@ function _simplesaml_auth_user_register($authname) {
             // You should implement hook_simplesamlphp_auth_user_roles_alter() in all other modules in which you want to alter $roles
             drupal_alter('simplesamlphp_auth_user_roles', $roles);
             if (!empty($roles)) {
-                $userinfo['roles'] = $roles;
+                $userinfo['roles'] = array_keys($roles);
             }
-            $user = user_save($user, $userinfo);
+
+            // Save values
+            $user_wrap = entity_metadata_wrapper('user', $user);
+            foreach ($userinfo as $name => $value) {
+                if (isset($user_wrap->{$name})) {
+                    $user_wrap->{$name}->set($value);
+                }
+            }
+            $user_wrap->save();
+
             return $user;
         } else {
             /**

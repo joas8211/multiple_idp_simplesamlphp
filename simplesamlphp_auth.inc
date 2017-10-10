@@ -68,14 +68,60 @@ function _simplesaml_auth_login_register() {
 
             // If we did not find a Drupal user, register a new one.
             if (!$ext_user) {
-                $ext_user = _simplesaml_auth_user_register($authname);
+				$propmap = $simplesamlphp_drupal->getAuthSourceAttributes()->prop_mapping;
+                $email = $simplesamlphp_drupal->getAttrsFromAssertion($propmap['mail']);
+                $existing_user = user_load_by_mail($email);
+
+                if ($existing_user) {
+                    // User with same email found, link it to this SAML user.
+                    $ext_user = _simplesaml_auth_user_link($existing_user, $authname);
+                } else {
+                    $ext_user = _simplesaml_auth_user_register($authname);
+                }
             }
             // End if.
-            _simplesaml_auth_user_login($ext_user);
+			if ($ext_user) {
+            	_simplesaml_auth_user_login($ext_user);
+			}
         }
         // End if.
     }
     // End if.
+}
+
+/**
+ * Link existing user to a SAML authenticated user.
+ *
+ * @param object $account
+ *   The user account to link SAML user with.
+ *
+ * @param string $authname
+ *   Gets the authname attribute from the SAML assertion as provided by
+ *   SimpleSAML_Drupal getAttrsFromAssertion()
+ *
+ * @return object
+ *   The linked user object, if successful.
+ */
+function _simplesaml_auth_user_link($account, $authname) {
+    try {
+        $simplesamlphp_drupal = SimpleSAML_Drupal::factory();
+        $simplesamlphp_auth_as = $simplesamlphp_drupal->getSimpleSAMLAuthSimple();
+        $simplesamlphp_authsource = $simplesamlphp_drupal->getAuthSourceAttributes();
+    } catch (Exception $e) {
+        watchdog_exception('simplesamlphp_auth', $e);
+    } // end try - catch
+    // First we check the admin settings for simpleSAMLphp and find out if we are allowed to link users.
+    if (variable_get('simplesamlphp_auth_registerusers', TRUE)) {
+        // We are allowed to link users.
+        _simplesaml_auth_debug(t('Link [%authname] to [%user_name]', array('%authname' => $authname, '%user_name' => $account->name)));
+
+        // Add authmap
+        user_set_authmaps($account, array(
+            "authname_simplesamlphp_auth" => $authname,
+        ));
+
+		return $account;
+    }
 }
 
 /**

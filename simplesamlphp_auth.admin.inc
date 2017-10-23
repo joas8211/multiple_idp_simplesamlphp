@@ -98,6 +98,18 @@ function simplesamlphp_auth_settings() {
     '#default_value' => variable_get('simplesamlphp_auth_allowdefaultlogin', TRUE),
     '#description' => t('Check this box if you want to let people log in with local Drupal accounts (without using simpleSAMLphp). If you want to restrict this privilege to certain users you can enter the Drupal user IDs in the field below.'),
   );
+  $form['simplesamlphp_auth_grp_auth']['simplesamlphp_auth_multistep_login'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable multistep login form'),
+    '#default_value' => variable_get('simplesamlphp_auth_multistep_login', TRUE),
+    '#description' => t('Ask username before password to make autodiscovery easier to use.'),
+	'#states' => array(
+		// Show option when default login allowed.
+		'visible' => array(
+			':input[name="simplesamlphp_auth_allowdefaultlogin"]' => array('checked' => TRUE),
+		),
+	),
+  );
   $form['simplesamlphp_auth_grp_auth']['simplesamlphp_auth_allowdefaultloginroles'] = array(
     '#type' => 'select',
     '#size' => 3,

@@ -280,7 +280,16 @@ function _simplesamlphp_auth_destroy_drupal_session() {
  */
 function simplesamlphp_auth_form_user_login_alter(&$form, &$form_state) {
   $GLOBALS['conf']['cache'] = FALSE;
-  if (!array_key_exists("step", $form_state) && empty($form_state['step'])) {
+  if (
+    variable_get('simplesamlphp_auth_allowdefaultlogin', TRUE) &&
+    !variable_get('simplesamlphp_auth_multistep_login', TRUE)
+  ) {
+    // Autodiscovery without multistep form
+    array_unshift($form['#validate'], 'saml_user_submit');
+  } elseif (
+    !array_key_exists("step", $form_state) &&
+    empty($form_state['step'])
+  ) {
     // Adding a new step 'form-element' to provide a 'multistepform'
     $form_state['step'] = 1;
     $form['next'] = array(

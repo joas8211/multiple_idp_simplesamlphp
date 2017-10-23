@@ -202,7 +202,9 @@ function simplesamlphp_auth_get_mappable_user_properties() {
   $user_property_info = entity_get_property_info('user');
   $mappable_base_properties = array_fill_keys(array('name', 'mail'), array());
   $properties = array_intersect_key($user_property_info['properties'], $mappable_base_properties);
-  $properties += $user_property_info['bundles']['user']['properties'];
+  if (isset($user_property_info['bundles']['user']['properties'])) {
+    $properties += $user_property_info['bundles']['user']['properties'];
+  }
   return $properties;
 }
 /**
@@ -358,6 +360,7 @@ function simplesamlphp_auth_form_submit($form, &$form_state) {
   );
 
   // Property mapping
+  $attributes['prop_mapping'] = array();
   $properties = simplesamlphp_auth_get_mappable_user_properties();
   foreach ($properties as $property_name => $property) {
       if (isset($form_state['values']['simplesamlphp_auth_prop_mapping_' . $property_name])) {
@@ -369,6 +372,7 @@ function simplesamlphp_auth_form_submit($form, &$form_state) {
   }
 
   // Role mapping
+  $attributes['role_mapping'] = array();
   $roles = user_roles(TRUE);
   foreach ($roles as $rid => $role_name) {
     if ($rid == DRUPAL_AUTHENTICATED_RID) {

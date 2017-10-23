@@ -74,7 +74,9 @@ function _simplesaml_auth_login_register() {
 
                 if ($existing_user) {
                     // User with same email found, link it to this SAML user.
-                    $ext_user = _simplesaml_auth_user_link($existing_user, $authname);
+                    if ($ext_user = _simplesaml_auth_user_link($existing_user, $authname)) {
+						drupal_set_message(t('This authentication method have been added to an existing account <i>%name</i>.', array('%name' => $ext_user->name)));
+					}
                 } else {
                     $ext_user = _simplesaml_auth_user_register($authname);
                 }

@@ -285,7 +285,7 @@ function simplesamlphp_auth_form_user_login_alter(&$form, &$form_state) {
     !variable_get('simplesamlphp_auth_multistep_login', TRUE)
   ) {
     // Autodiscovery without multistep form
-    array_unshift($form['#validate'], 'saml_user_submit');
+    array_unshift($form['#validate'], 'saml_login_form_autodiscovery');
   } elseif (
     !array_key_exists("step", $form_state) &&
     empty($form_state['step'])
@@ -342,11 +342,29 @@ function simplesamlphp_auth_init() {
 }
 
 /**
- * Helper funtion to find out the idp domain
- * @return true and redirect users to their idp login
+ * Validation callback to redirect to SSO login if IdP domain found.
+ */
+function saml_login_form_autodiscovery($form, &$form_state) {
+  $mail = $form_state['input']['name'];
+  saml_autodiscovery($mail);
+}
+
+/**
+ * Callback from first stage of multistep form.
  */
 function saml_user_submit($form, &$form_state) {
   $mail = $form_state['input']['name'];
+  if (!saml_autodiscovery($mail)) {
+    $form_state['rebuild'] = TRUE;
+    return;
+  } // end if
+}
+
+/**
+ * Helper funtion to find out the idp domain and redirect to the login page.
+ * @param $mail submitted email
+ */
+function saml_autodiscovery($mail) {
   if (!empty($mail)) {
     $mail = check_plain($mail);
     $domain = substr(strrchr($mail, "@"), 1);
@@ -366,11 +384,7 @@ function saml_user_submit($form, &$form_state) {
       $base_url_saml = _simplesamlphp_auth_forcehttps_rewrite($base_url);
       header("Location: " . $base_url_saml . '/saml_login/' . $idpId, TRUE, 301);
       die();
-    }
-    else {
-      $form_state['rebuild'] = TRUE;
-      return;
-    } // end if else
+    } // end if
   } // end if - mail
 }
 
